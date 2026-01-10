@@ -1,5 +1,6 @@
 package com.example.tpdlq.service;
 
+import com.example.tpdlq.model.ErrorCategory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,8 +33,13 @@ public class MessageProducerService {
     }
 
     public void sendToDlqTopic(String message, String reason) {
-        String dlqMessage = String.format("{\"reason\":\"%s\",\"originalMessage\":%s}", reason, message);
-        logger.warn("Sending message to DLQ topic {} with reason: {}", dlqTopic, reason);
+        sendToDlqTopic(message, reason, ErrorCategory.UNKNOWN_ERROR);
+    }
+
+    public void sendToDlqTopic(String message, String reason, ErrorCategory category) {
+        String dlqMessage = String.format("{\"reason\":\"%s\",\"originalMessage\":%s,\"category\":\"%s\"}", 
+                reason, message, category.getDisplayName());
+        logger.warn("Sending message to DLQ topic {} with reason: {} (Category: {})", dlqTopic, reason, category);
         kafkaTemplate.send(dlqTopic, dlqMessage);
     }
 }
