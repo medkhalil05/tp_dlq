@@ -30,4 +30,10 @@ public class MessageProducerService {
         logger.warn("Sending message to DLQ topic {}: {}", dlqTopic, message);
         kafkaTemplate.send(dlqTopic, message);
     }
+
+    public void sendToDlqTopic(String message, String reason) {
+        String dlqMessage = String.format("{\"reason\":\"%s\",\"originalMessage\":%s}", reason, message);
+        logger.warn("Sending message to DLQ topic {} with reason: {}", dlqTopic, reason);
+        kafkaTemplate.send(dlqTopic, dlqMessage);
+    }
 }

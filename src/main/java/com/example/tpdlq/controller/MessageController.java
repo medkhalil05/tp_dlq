@@ -1,5 +1,6 @@
 package com.example.tpdlq.controller;
 
+import com.example.tpdlq.service.FileProducerService;
 import com.example.tpdlq.service.MessageProducerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,9 @@ public class MessageController {
 
     @Autowired
     private MessageProducerService messageProducerService;
+
+    @Autowired
+    private FileProducerService fileProducerService;
 
     @PostMapping("/send")
     public ResponseEntity<String> sendMessage(@RequestBody String message) {
@@ -30,6 +34,17 @@ public class MessageController {
         String invalidMessage = "This is an invalid message";
         messageProducerService.sendToInputTopic(invalidMessage);
         return ResponseEntity.ok("Invalid message sent: " + invalidMessage);
+    }
+
+    @PostMapping("/process-file")
+    public ResponseEntity<String> processFile(@RequestBody String filePath) {
+        try {
+            fileProducerService.processJsonlFile(filePath);
+            return ResponseEntity.ok("File processing started for: " + filePath);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("Error processing file: " + e.getMessage());
+        }
     }
 
     @GetMapping("/health")
