@@ -49,6 +49,7 @@
                     <thead>
                         <tr>
                             <th>Timestamp</th>
+                            <th>Category</th>
                             <th>Reason</th>
                             <th>Original Message</th>
                         </tr>
@@ -56,6 +57,7 @@
                     <tbody>
                         <tr th:each="msg : ${dlqMessages}">
                             <td th:text="${#temporals.format(msg.timestamp, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                            <td class="category" th:text="${msg.category != null ? msg.category.displayName : 'Unknown'}"></td>
                             <td class="reason" th:text="${msg.reason}"></td>
                             <td class="message" th:text="${msg.originalMessage}"></td>
                         </tr>

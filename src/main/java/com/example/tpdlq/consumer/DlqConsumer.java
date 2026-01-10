@@ -1,6 +1,7 @@
 package com.example.tpdlq.consumer;
 
 import com.example.tpdlq.model.DlqMessage;
+import com.example.tpdlq.model.ErrorCategory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -25,26 +26,40 @@ public class DlqConsumer {
     @KafkaListener(topics = "${kafka.topic.dlq}", groupId = "${spring.kafka.consumer.group-id}-dlq")
     public void consumeFromDlq(String message) {
         try {
-            // Try to parse the DLQ message to extract reason and original message
+            // Try to parse the DLQ message to extract reason, original message, and category
             JsonNode jsonNode = objectMapper.readTree(message);
             if (jsonNode.has("reason") && jsonNode.has("originalMessage")) {
                 String reason = jsonNode.get("reason").asText();
                 String originalMessage = jsonNode.get("originalMessage").toString();
-                logger.error("DLQ Consumer - Reason: {} | Original Message: {}", reason, originalMessage);
+                
+                // Extract category if present
+                ErrorCategory category = ErrorCategory.UNKNOWN_ERROR;
+                if (jsonNode.has("category")) {
+                    String categoryStr = jsonNode.get("category").asText();
+                    try {
+                        category = ErrorCategory.valueOf(categoryStr.toUpperCase().replace(" ", "_"));
+                    } catch (IllegalArgumentException e) {
+                        // If category doesn't match enum, use UNKNOWN_ERROR
+                        category = ErrorCategory.UNKNOWN_ERROR;
+                    }
+                }
+                
+                logger.error("DLQ Consumer - Category: {} | Reason: {} | Original Message: {}", 
+                        category, reason, originalMessage);
                 
                 // Store message for display
-                DlqMessage dlqMessage = new DlqMessage(reason, originalMessage);
+                DlqMessage dlqMessage = new DlqMessage(reason, originalMessage, category);
                 dlqMessages.add(dlqMessage);
             } else {
                 // Old format or plain message
                 logger.error("DLQ Consumer - Received error message: {}", message);
-                DlqMessage dlqMessage = new DlqMessage("Unknown", message);
+                DlqMessage dlqMessage = new DlqMessage("Unknown", message, ErrorCategory.UNKNOWN_ERROR);
                 dlqMessages.add(dlqMessage);
             }
         } catch (Exception e) {
             // If parsing fails, log as-is
             logger.error("DLQ Consumer - Received error message: {}", message);
-            DlqMessage dlqMessage = new DlqMessage("Parse Error", message);
+            DlqMessage dlqMessage = new DlqMessage("Parse Error", message, ErrorCategory.MALFORMED_ERROR);
             dlqMessages.add(dlqMessage);
         }
         // Monitor and handle error messages from DLQ

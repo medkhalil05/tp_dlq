@@ -1,7 +1,9 @@
 package com.example.tpdlq.consumer;
 
+import com.example.tpdlq.model.ErrorCategory;
 import com.example.tpdlq.model.Order;
 import com.example.tpdlq.service.MessageProducerService;
+import com.example.tpdlq.service.OrderValidator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,9 @@ public class MainConsumer {
     @Autowired
     private MessageProducerService messageProducerService;
 
+    @Autowired
+    private OrderValidator orderValidator;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @KafkaListener(topics = "${kafka.topic.input}", groupId = "${spring.kafka.consumer.group-id}")
@@ -28,33 +33,20 @@ public class MainConsumer {
             Order order = objectMapper.readValue(message, Order.class);
             
             // Validate the order
-            String validationError = validateOrder(order);
+            String validationError = orderValidator.validateOrder(order);
             if (validationError != null) {
-                handleInvalidMessage(message, validationError);
+                handleInvalidMessage(message, validationError, ErrorCategory.VALIDATION_ERROR);
             } else {
                 processValidMessage(message, order);
             }
+        } catch (IllegalArgumentException e) {
+            logger.error("Validation error for message: {}", message, e);
+            messageProducerService.sendToDlqTopic(message, "Validation error: " + e.getMessage(), ErrorCategory.VALIDATION_ERROR);
         } catch (Exception e) {
             logger.error("Error parsing message as JSON: {}", message, e);
             // Send malformed JSON to DLQ
-            messageProducerService.sendToDlqTopic(message, "Malformed JSON: " + e.getMessage());
+            messageProducerService.sendToDlqTopic(message, "Malformed JSON: " + e.getMessage(), ErrorCategory.MALFORMED_ERROR);
         }
-    }
-
-    private String validateOrder(Order order) {
-        if (order.getOrderId() == null || order.getOrderId().trim().isEmpty()) {
-            return "Missing required field: orderId";
-        }
-        if (order.getUserId() == null || order.getUserId().trim().isEmpty()) {
-            return "Missing required field: userId";
-        }
-        if (order.getAmount() == null) {
-            return "Missing required field: amount";
-        }
-        if (order.getAmount() <= 0) {
-            return "Invalid amount: must be greater than 0";
-        }
-        return null; // Valid
     }
 
     private void processValidMessage(String message, Order order) {
@@ -62,8 +54,8 @@ public class MainConsumer {
         // Business logic for valid messages would go here
     }
 
-    private void handleInvalidMessage(String message, String reason) {
-        logger.warn("Invalid message detected: {}. Reason: {}", message, reason);
-        messageProducerService.sendToDlqTopic(message, reason);
+    private void handleInvalidMessage(String message, String reason, ErrorCategory category) {
+        logger.warn("Invalid message detected: {}. Reason: {} (Category: {})", message, reason, category);
+        messageProducerService.sendToDlqTopic(message, reason, category);
     }
 }
