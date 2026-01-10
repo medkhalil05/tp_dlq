@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DLQ Monitoring System</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Dead Letter Queue (DLQ) Monitoring System</h1>
+            <p>Upload JSONL files and monitor failed messages</p>
+        </header>
+
+        <!-- Flash Messages -->
+        <div th:if="${message}" 
+             th:class="${messageType == 'success' ? 'alert alert-success' : 'alert alert-error'}">
+            <span th:text="${message}"></span>
+        </div>
+
+        <!-- File Upload Section -->
+        <section class="upload-section">
+            <h2>Upload JSONL File</h2>
+            <form method="POST" enctype="multipart/form-data" action="/upload">
+                <div class="form-group">
+                    <label for="file">Select .jsonl file:</label>
+                    <input type="file" id="file" name="file" accept=".jsonl" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Upload and Process</button>
+            </form>
+            <p class="help-text">
+                Upload a JSON Lines (.jsonl) file containing order data. 
+                Each line will be processed and sent to the <code>tp8-input</code> Kafka topic.
+            </p>
+        </section>
+
+        <!-- DLQ Messages Table -->
+        <section class="dlq-section">
+            <h2>DLQ Messages</h2>
+            <p class="help-text">Messages that failed validation are displayed below:</p>
+            
+            <div th:if="${#lists.isEmpty(dlqMessages)}" class="empty-state">
+                <p>No DLQ messages yet. Upload a file with invalid data to see them here.</p>
+            </div>
+
+            <div th:if="${!#lists.isEmpty(dlqMessages)}" class="table-container">
+                <table class="dlq-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Reason</th>
+                            <th>Original Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="msg : ${dlqMessages}">
+                            <td th:text="${#temporals.format(msg.timestamp, 'yyyy-MM-dd HH:mm:ss')}"></td>
+                            <td class="reason" th:text="${msg.reason}"></td>
+                            <td class="message" th:text="${msg.originalMessage}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer>
+            <p>Dead Letter Queue Pattern with Spring Boot and Kafka</p>
+        </footer>
+    </div>
+</body>
+</html>
