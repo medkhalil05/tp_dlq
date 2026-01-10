@@ -1,6 +1,6 @@
 # Dead Letter Queue (DLQ) Pattern - Spring Boot & Kafka
 
-This project demonstrates the implementation of the Dead Letter Queue (DLQ) pattern using Java Spring Boot and Apache Kafka.
+This project demonstrates the implementation of the Dead Letter Queue (DLQ) pattern using Java Spring Boot and Apache Kafka, with support for JSON Lines (.jsonl) file processing.
 
 ## Features
 
@@ -10,21 +10,31 @@ This project demonstrates the implementation of the Dead Letter Queue (DLQ) patt
 
 2. **Message Producers**:
    - Service for sending messages to Kafka topics (`tp8-input` and `tp8-dlq`)
+   - File producer service for processing `.jsonl` files
 
 3. **Consumers**:
-   - Main consumer for the `tp8-input` topic with validation logic
-   - DLQ consumer for monitoring error messages from the `tp8-dlq` topic
+   - Main consumer for the `tp8-input` topic with JSON validation logic
+   - DLQ consumer for monitoring error messages from the `tp8-dlq` topic with reason tracking
 
-4. **Validation Logic**:
-   - Valid messages contain the keyword `valid`
-   - Invalid messages are redirected to the DLQ topic
+4. **JSON Validation Logic**:
+   - Validates JSON orders with required fields: `orderId`, `userId`, `amount`
+   - Ensures `amount` is greater than 0
+   - Sends invalid messages to DLQ with detailed error reasons
+   - Handles malformed JSON gracefully
 
-5. **Retry Strategy**:
+5. **JSONL File Processing**:
+   - Reads `.jsonl` (JSON Lines) files line by line
+   - Validates each JSON line before sending to Kafka
+   - Skips malformed lines with error logging
+   - Provides processing statistics
+
+6. **Retry Strategy**:
    - Scheduled retry mechanism (runs every 5 minutes)
    - Placeholder for processing messages from the DLQ topic
 
-6. **REST APIs**:
-   - Endpoints to send valid and invalid messages for testing
+7. **REST APIs**:
+   - Endpoints to send individual messages for testing
+   - Endpoint to trigger file-based production from `.jsonl` files
 
 ## Prerequisites
 
@@ -98,63 +108,100 @@ The application will start on port 8080.
 curl http://localhost:8080/api/messages/health
 ```
 
-### Send a valid message
-```bash
-curl -X POST http://localhost:8080/api/messages/send-valid
-```
-
-### Send an invalid message
-```bash
-curl -X POST http://localhost:8080/api/messages/send-invalid
-```
-
-### Send a custom message
+### Send a valid JSON order
 ```bash
 curl -X POST http://localhost:8080/api/messages/send \
-  -H "Content-Type: text/plain" \
-  -d "This is a valid custom message"
+  -H "Content-Type: application/json" \
+  -d '{"orderId":"o1","userId":"u1","amount":120.5}'
 ```
 
+### Send an invalid JSON order (missing userId)
 ```bash
 curl -X POST http://localhost:8080/api/messages/send \
+  -H "Content-Type: application/json" \
+  -d '{"orderId":"o2","amount":15.0}'
+```
+
+### Send an invalid JSON order (negative amount)
+```bash
+curl -X POST http://localhost:8080/api/messages/send \
+  -H "Content-Type: application/json" \
+  -d '{"orderId":"o3","userId":"u3","amount":-5}'
+```
+
+### Process a JSONL file
+```bash
+curl -X POST http://localhost:8080/api/messages/process-file \
   -H "Content-Type: text/plain" \
-  -d "This message will go to DLQ"
+  -d "/absolute/path/to/orders_in.jsonl"
+```
+
+For testing with the provided sample file:
+```bash
+curl -X POST http://localhost:8080/api/messages/process-file \
+  -H "Content-Type: text/plain" \
+  -d "$(pwd)/orders_in.jsonl"
 ```
 
 ## Expected Behavior
 
-1. **Valid messages** (containing the keyword "valid"):
+1. **Valid JSON orders** (all required fields present, amount > 0):
    - Processed successfully
    - Logged with INFO level
    - Remain in the main processing flow
 
-2. **Invalid messages** (not containing "valid"):
-   - Redirected to the DLQ topic
+2. **Invalid JSON orders** (missing fields or amount <= 0):
+   - Redirected to the DLQ topic with reason
    - Logged with WARN level
    - Consumed by DLQ consumer
-   - Logged with ERROR level in DLQ consumer
+   - Logged with ERROR level in DLQ consumer including the reason
 
-3. **Retry mechanism**:
+3. **Malformed JSON**:
+   - Skipped during file processing or sent to DLQ if sent via consumer
+   - Logged with ERROR level
+   - Error reason provided in DLQ message
+
+4. **Retry mechanism**:
    - Runs every 5 minutes
    - Placeholder for reprocessing DLQ messages
+
+## Sample JSONL File
+
+The repository includes a sample `orders_in.jsonl` file with test data:
+- Line 1: Valid order
+- Line 2: Valid order
+- Line 3: Malformed JSON (missing closing brace)
+- Line 4: Invalid order (missing userId)
+- Line 5: Invalid order (negative amount)
 
 ## Project Structure
 
 ```
 tp-dlq/
+├── orders_in.jsonl                                # Sample JSONL file for testing
 ├── src/
 │   ├── main/
 │   │   ├── java/com/example/tpdlq/
-│   │   │   ├── TpDlqApplication.java          # Main application class
+│   │   │   ├── TpDlqApplication.java              # Main application class
 │   │   │   ├── config/
-│   │   │   │   └── KafkaTopicConfig.java      # Kafka topics configuration
+│   │   │   │   └── KafkaTopicConfig.java          # Kafka topics configuration
 │   │   │   ├── consumer/
-│   │   │   │   ├── MainConsumer.java          # Main topic consumer
-│   │   │   │   └── DlqConsumer.java           # DLQ topic consumer
+│   │   │   │   ├── MainConsumer.java              # Main topic consumer with JSON validation
+│   │   │   │   └── DlqConsumer.java               # DLQ topic consumer with reason logging
 │   │   │   ├── controller/
-│   │   │   │   └── MessageController.java     # REST API endpoints
+│   │   │   │   └── MessageController.java         # REST API endpoints
+│   │   │   ├── model/
+│   │   │   │   └── Order.java                     # Order model for JSON validation
 │   │   │   └── service/
-│   │   │       ├── MessageProducerService.java # Message producer service
+│   │   │       ├── MessageProducerService.java    # Message producer service
+│   │   │       ├── FileProducerService.java       # JSONL file processor
+│   │   │       └── RetryService.java              # Scheduled retry service
+│   │   └── resources/
+│   │       └── application.properties             # Application configuration
+│   └── test/
+├── pom.xml
+└── README.md
+```
 │   │   │       └── RetryService.java          # Scheduled retry service
 │   │   └── resources/
 │   │       └── application.properties         # Application configuration
