@@ -1,19 +1,23 @@
 package com.example.tpdlq.model;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public class DlqMessage {
+    private final String id;
     private String reason;
     private String originalMessage;
     private LocalDateTime timestamp;
     private ErrorCategory category;
 
     public DlqMessage() {
+        this.id = UUID.randomUUID().toString();
         this.timestamp = LocalDateTime.now();
         this.category = ErrorCategory.UNKNOWN_ERROR;
     }
 
     public DlqMessage(String reason, String originalMessage) {
+        this.id = UUID.randomUUID().toString();
         this.reason = reason;
         this.originalMessage = originalMessage;
         this.timestamp = LocalDateTime.now();
@@ -21,10 +25,15 @@ public class DlqMessage {
     }
 
     public DlqMessage(String reason, String originalMessage, ErrorCategory category) {
+        this.id = UUID.randomUUID().toString();
         this.reason = reason;
         this.originalMessage = originalMessage;
         this.timestamp = LocalDateTime.now();
         this.category = category;
+    }
+
+    public String getId() {
+        return id;
     }
 
     public String getReason() {

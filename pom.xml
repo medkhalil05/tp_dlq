@@ -41,6 +41,12 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
+        <!-- Actuator for metrics and health endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- Spring Boot Starter Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
