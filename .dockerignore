@@ -1,0 +1,31 @@
+# .dockerignore — exclude unnecessary files from Docker build
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE / Editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Maven
+target/
+.m2/
+*.log
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+*.md
+
+# Other
+*.jar.original
