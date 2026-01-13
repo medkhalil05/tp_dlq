@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Scrape tp-dlq Spring Boot application
+  - job_name: 'tp-dlq-app'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['tp-dlq:8080']
+        labels:
+          application: 'tp-dlq'
+          environment: 'dev'

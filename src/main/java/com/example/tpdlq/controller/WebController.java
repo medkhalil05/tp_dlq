@@ -72,6 +72,48 @@ public class WebController {
                 });
     }
 
+    @PostMapping("/dlq/reprocess-edited/{id}")
+    public String reprocessEditedMessage(@PathVariable String id,
+                                          @RequestParam("editedMessage") String editedMessage,
+                                          RedirectAttributes redirectAttributes) {
+        if (dlqConsumer.findById(id).isPresent()) {
+            try {
+                messageProducerService.sendToInputTopic(editedMessage);
+                dlqConsumer.removeById(id);
+                redirectAttributes.addFlashAttribute("message", "Reprocessed edited message " + id + " successfully.");
+                redirectAttributes.addFlashAttribute("messageType", "success");
+                logger.info("Reprocessed edited DLQ message {}", id);
+            } catch (Exception e) {
+                redirectAttributes.addFlashAttribute("message", "Error reprocessing edited message: " + e.getMessage());
+                redirectAttributes.addFlashAttribute("messageType", "error");
+                logger.error("Error reprocessing edited message {}", id, e);
+            }
+        } else {
+            redirectAttributes.addFlashAttribute("message", "Message not found.");
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+        return "redirect:/";
+    }
+
+    @PostMapping("/dlq/reprocess-all")
+    public String reprocessAllDlq(RedirectAttributes redirectAttributes) {
+        List<DlqMessage> messages = dlqConsumer.getDlqMessages();
+        int count = 0;
+        for (DlqMessage msg : messages) {
+            try {
+                messageProducerService.sendToInputTopic(msg.getOriginalMessage());
+                dlqConsumer.removeById(msg.getId());
+                count++;
+            } catch (Exception e) {
+                logger.error("Error reprocessing DLQ message {}", msg.getId(), e);
+            }
+        }
+        redirectAttributes.addFlashAttribute("message", "Reprocessed " + count + " DLQ messages.");
+        redirectAttributes.addFlashAttribute("messageType", "success");
+        logger.info("Bulk reprocessed {} DLQ messages", count);
+        return "redirect:/";
+    }
+
     @PostMapping("/dlq/clear")
     public String clearDlq(RedirectAttributes redirectAttributes) {
         dlqConsumer.clearDlqMessages();

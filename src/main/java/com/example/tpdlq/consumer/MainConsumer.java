@@ -52,7 +52,11 @@ public class MainConsumer {
             // Validate the order
             String validationError = orderValidator.validateOrder(order);
             if (validationError != null) {
-                handleInvalidMessage(message, validationError, ErrorCategory.VALIDATION_ERROR);
+                // Check if it's a malformed error (extra fields)
+                ErrorCategory category = validationError.contains("Malformed JSON: unexpected fields") 
+                    ? ErrorCategory.MALFORMED_ERROR 
+                    : ErrorCategory.VALIDATION_ERROR;
+                handleInvalidMessage(message, validationError, category);
             } else {
                 processValidMessage(message, order);
                 validCounter.increment();

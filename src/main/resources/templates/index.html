@@ -61,9 +61,17 @@
         <section class="dlq-section">
             <h2>DLQ Messages</h2>
             <p class="help-text">Messages that failed validation are displayed below:</p>
-            <form action="/dlq/clear" method="post" style="margin: 10px 20px;">
-                <button type="submit" class="btn btn-danger">Clear DLQ</button>
-            </form>
+            <div style="margin: 10px 20px; display: flex; gap: 10px;">
+                <form action="/dlq/clear" method="post">
+                    <button type="submit" class="btn btn-danger">Clear DLQ</button>
+                </form>
+                <form action="/dlq/reprocess-all" method="post" th:if="${!#lists.isEmpty(dlqMessages)}">
+                    <button type="submit" class="btn btn-primary" 
+                            onclick="return confirm('Reprocess all DLQ messages? This will resend all messages to the input topic.');">
+                        Reprocess All
+                    </button>
+                </form>
+            </div>
             
             <div th:if="${#lists.isEmpty(dlqMessages)}" class="empty-state">
                 <p>No DLQ messages yet. Upload a file with invalid data to see them here.</p>
@@ -91,8 +99,12 @@
                             <td><span class="pill" th:text="${msg.reason}"></span></td>
                             <td class="message" th:text="${msg.originalMessage}"></td>
                             <td>
-                                <form th:action="@{'/dlq/reprocess/' + ${msg.id}}" method="post">
-                                    <button type="submit" class="btn btn-secondary">Reprocess</button>
+                                <button type="button" class="btn btn-secondary btn-sm edit-btn" 
+                                        th:attr="data-id=${msg.id}, data-message=${msg.originalMessage}, data-reason=${msg.reason}">
+                                    Edit & Fix
+                                </button>
+                                <form th:action="@{'/dlq/reprocess/' + ${msg.id}}" method="post" style="display:inline;">
+                                    <button type="submit" class="btn btn-secondary btn-sm">Reprocess</button>
                                 </form>
                             </td>
                         </tr>
@@ -141,5 +153,73 @@
             <p>Dead Letter Queue Pattern with Spring Boot and Kafka</p>
         </footer>
     </div>
+
+    <!-- Edit Message Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit & Fix Invalid Message</h2>
+                <span class="close" onclick="closeEditModal()">&times;</span>
+            </div>
+            <form id="editForm" method="post">
+                <div class="modal-body">
+                    <p class="help-text" id="modalReason"></p>
+                    <label for="editedMessage">Edit JSON:</label>
+                    <textarea id="editedMessage" name="editedMessage" rows="6" required></textarea>
+                    <div class="suggestions" id="suggestions"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Reprocess Fixed Message</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Attach event listeners to all edit buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.edit-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    const message = this.getAttribute('data-message');
+                    const reason = this.getAttribute('data-reason');
+                    openEditModal(id, message, reason);
+                });
+            });
+        });
+
+        function openEditModal(id, originalMessage, reason) {
+            document.getElementById('editModal').style.display = 'block';
+            document.getElementById('editForm').action = '/dlq/reprocess-edited/' + id;
+            document.getElementById('editedMessage').value = originalMessage;
+            document.getElementById('modalReason').textContent = 'Issue: ' + reason;
+            
+            // Generate suggestions based on reason
+            const suggestions = document.getElementById('suggestions');
+            suggestions.innerHTML = '';
+            if (reason.includes('Missing required field: userId')) {
+                suggestions.innerHTML = '<p class="suggestion">💡 Add missing field: <code>"userId": "uXXX"</code></p>';
+            } else if (reason.includes('Missing required field: orderId')) {
+                suggestions.innerHTML = '<p class="suggestion">💡 Add missing field: <code>"orderId": "oXXX"</code></p>';
+            } else if (reason.includes('amount')) {
+                suggestions.innerHTML = '<p class="suggestion">💡 Ensure <code>"amount"</code> is a positive number</p>';
+            } else if (reason.includes('Malformed JSON')) {
+                suggestions.innerHTML = '<p class="suggestion">💡 Fix JSON syntax (check brackets, quotes, commas)</p>';
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target == modal) {
+                closeEditModal();
+            }
+        }
+    </script>
 </body>
 </html>

@@ -7,6 +7,7 @@ A pragmatic Dead Letter Queue (DLQ) demo built with Spring Boot and Apache Kafka
 - REST endpoints for direct sends and file processing.
 - Validation pipeline: parse JSON → validate required fields → route to DLQ with category/reason if invalid.
 - Metrics: counters for processed/valid/invalid/malformed messages, DLQ backlog gauge.
+- **Prometheus & Grafana**: Built-in monitoring stack for metrics visualization and alerting.
 
 ## Key Features
 - **Kafka integration**: input topic `tp8-input`, DLQ topic `tp8-dlq` ([application.properties](src/main/resources/application.properties)).
@@ -14,7 +15,9 @@ A pragmatic Dead Letter Queue (DLQ) demo built with Spring Boot and Apache Kafka
 - **DLQ handling**: structured DLQ payload with `reason`, `category`, and quoted `originalMessage` ([MessageProducerService](src/main/java/com/example/tpdlq/service/MessageProducerService.java)).
 - **Consumers**: main consumer validates; DLQ consumer logs/stores errors ([MainConsumer](src/main/java/com/example/tpdlq/consumer/MainConsumer.java), [DlqConsumer](src/main/java/com/example/tpdlq/consumer/DlqConsumer.java)).
 - **Web dashboard**: list DLQ messages with badges, reprocess by ID, and visualize recent valid messages ([index.html](src/main/resources/templates/index.html), [WebController](src/main/java/com/example/tpdlq/controller/WebController.java)).
-- **Metrics & health**: Actuator endpoints (`/actuator/metrics`, `/actuator/health`, `/actuator/info`).
+- **Metrics & health**: Actuator endpoints (`/actuator/metrics`, `/actuator/health`, `/actuator/info`, `/actuator/prometheus`).
+- **Prometheus monitoring**: Automatic metrics collection and scraping from Spring Boot Actuator.
+- **Grafana dashboards**: Pre-configured visualization for real-time monitoring.
 
 ## Architecture
 - Producers: [MessageProducerService](src/main/java/com/example/tpdlq/service/MessageProducerService.java), [FileProducerService](src/main/java/com/example/tpdlq/service/FileProducerService.java)
@@ -50,7 +53,7 @@ Edit [src/main/resources/application.properties](src/main/resources/application.
 - `spring.kafka.consumer.group-id=tp8-consumer-group`
 - `kafka.topic.input=tp8-input`
 - `kafka.topic.dlq=tp8-dlq`
-- Actuator exposure: `management.endpoints.web.exposure.include=health,info,metrics`
+- Actuator exposure: `management.endpoints.web.exposure.include=health,info,metrics,prometheus`
 
 ### Local Development (without Docker)
 If running locally without Docker Compose, override the Kafka bootstrap server:
@@ -61,15 +64,18 @@ mvn -DskipTests spring-boot:run
 ## Build & Run
 
 ### Option 1: Docker Compose (Recommended)
-The easiest way — includes Kafka, Zookeeper, and the app in one command:
+The easiest way — includes Kafka, Zookeeper, application, Prometheus, and Grafana in one command:
 ```bash
 cd /home/khalil/tp_dlq
 docker-compose up --build
 ```
 Then:
-- Dashboard: http://localhost:8080/
-- Kafka: localhost:9092 (accessible from host)
-- Metrics: http://localhost:8080/actuator/metrics
+- **Application Dashboard**: http://localhost:8080/
+- **Prometheus UI**: http://localhost:9090/
+- **Grafana Dashboard**: http://localhost:3000/ (admin/admin)
+- **Kafka**: localhost:9092 (accessible from host)
+- **Metrics Endpoint**: http://localhost:8080/actuator/metrics
+- **Prometheus Metrics**: http://localhost:8080/actuator/prometheus
 
 To stop:
 ```bash
@@ -111,8 +117,41 @@ Base: `/api/messages`
 - Clear lists: `POST /dlq/clear`, `POST /valid/clear`.
 - View valid messages table (recent).
 
+## Monitoring Stack
+
+### Prometheus
+Prometheus automatically scrapes metrics from the Spring Boot application every 15 seconds.
+
+**Access Prometheus UI**: http://localhost:9090
+
+**Useful Queries**:
+- All metrics: `{job="tp-dlq-app"}`
+- Message rate: `rate(tpdlq_messages_processed_total[1m])`
+- DLQ backlog: `tpdlq_dlq_backlog`
+- Error rate: `rate(tpdlq_messages_invalid_total[5m])`
+
+**Check Targets**: Navigate to Status → Targets to verify scraping status.
+
+### Grafana
+Grafana provides rich visualization and dashboards for metrics.
+
+**Access Grafana**: http://localhost:3000 (default credentials: admin/admin)
+
+**Setup Data Source**:
+1. Go to Configuration → Data Sources
+2. Add Prometheus data source
+3. URL: `http://prometheus:9090`
+4. Click "Save & Test"
+
+**Create Dashboard**:
+1. Click "+" → Dashboard → Add new panel
+2. Use PromQL queries like `tpdlq_messages_processed_total`
+3. Configure visualization (graph, gauge, table)
+4. Save dashboard
+
 ## Metrics
 - Actuator: `/actuator/metrics`
+- Prometheus endpoint: `/actuator/prometheus`
 - Counters: `tpdlq_messages_processed_total`, `tpdlq_messages_valid_total`, `tpdlq_messages_invalid_total`, `tpdlq_messages_malformed_total`
 - DLQ: `tpdlq_dlq_total`, `tpdlq_dlq_category_total{category=...}`
 - Gauge: `tpdlq_dlq_backlog`
@@ -134,9 +173,10 @@ curl -X POST http://localhost:8080/api/messages/process-file \
 
 ## Files & Configuration
 - [Dockerfile](Dockerfile) — multi-stage build (Maven → Java 17 Alpine)
-- [docker-compose.yml](docker-compose.yml) — Zookeeper, Kafka, tp-dlq services
+- [docker-compose.yml](docker-compose.yml) — Zookeeper, Kafka, tp-dlq, Prometheus, Grafana services
+- [prometheus.yml](prometheus.yml) — Prometheus scrape configuration
 - [.dockerignore](.dockerignore) — excludes build artifacts from Docker context
-- [application.properties](src/main/resources/application.properties) — Kafka/server config
+- [application.properties](src/main/resources/application.properties) — Kafka/server config and Prometheus endpoint exposure
 
 ## License
 Educational use only.
