@@ -179,4 +179,4 @@ curl -X POST http://localhost:8080/api/messages/process-file \
 - [application.properties](src/main/resources/application.properties) — Kafka/server config and Prometheus endpoint exposure
 
 ## License
-Educational use only.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

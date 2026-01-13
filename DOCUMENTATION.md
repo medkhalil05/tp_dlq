@@ -726,7 +726,7 @@ management.endpoints.web.exposure.include=health,info,metrics
 
 ## License
 
-Educational use only.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
